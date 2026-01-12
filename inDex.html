@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Pickup – Boka hämtning</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<style>
+:root{
+  --bg:#e6fbfb;
+  --accent:#00b4a2;
+  --accent-2:#ffd54d;
+  --card:#ffffff;
+  --muted:#6b6b6b;
+}
+*{box-sizing:border-box}
+body{font-family:Inter, Roboto, Arial, sans-serif;background:linear-gradient(180deg,#f7fbfb 0%, #eaf9f8 100%);margin:0;padding:18px;color:#0b0b0b}
+.wrap{max-width:980px;margin:0 auto}
+header{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#00d0b1);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:20px}
+h1{margin:0;font-size:20px}
+p.lead{margin:6px 0 14px;color:var(--muted)}
+.card{background:var(--card);border-radius:14px;padding:18px;box-shadow:0 10px 30px rgba(3,54,48,0.06);}
+.grid{display:grid;grid-template-columns:1fr 300px;gap:18px} /* Minskat kartbredd */
+@media (max-width:950px){.grid{grid-template-columns:1fr}}
+label{display:block;font-weight:600;margin-top:12px}
+input[type=text],input[type=tel],input[type=email],select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid #e2eeec;background:#fbfffe}
+textarea{min-height:110px;resize:vertical}
+.row{display:flex;gap:10px}
+.row > *{flex:1}
+.btn{background:var(--accent);color:#fff;padding:12px;border-radius:10px;border:none;cursor:pointer;font-weight:700}
+.btn.yellow{background:var(--accent-2);color:#000}
+#map{height:260px;border-radius:10px;border:1px solid #e3f6f4}
+.checkbox-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+.checkbox-item{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px;background:#f6fffd;border:1px solid #e9f8f6;cursor:pointer}
+.checkbox-item input{transform:scale(1.15)}
+.payment-grid{display:flex;gap:12px;margin-top:8px}
+.payment-card{padding:10px;border-radius:8px;background:#fff;border:1px solid #efeaea;display:flex;align-items:center;gap:10px;cursor:pointer}
+.pricebox{margin-top:12px;padding:12px;border-radius:10px;background:linear-gradient(90deg,#ffffff,#fbfffd);border:1px solid #eaf7f4}
+.pricebox strong{font-size:16px}
+.preview{margin-top:8px;max-height:140px;border-radius:8px;border:1px solid #e6f5f2}
+.small{color:var(--muted);font-size:13px}
+.success{margin-top:12px;padding:12px;background:#f1fff5;border:1px solid #caf0d3;border-radius:8px;color:#0b5a2b}
+
+/* Modal */
+.modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);justify-content:center;align-items:center;z-index:999}
+.modal-content{background:#fff;padding:20px;border-radius:10px;max-width:400px;width:90%;box-shadow:0 10px 30px rgba(0,0,0,0.3)}
+.modal-close{cursor:pointer;font-weight:bold;float:right;font-size:18px;margin-top:-10px;margin-right:-10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<div class="logo">PU</div>
+<div>
+<h1>Pickup — vi hämtar det du vill bli av med</h1>
+<p class="lead">Snabb lokal hämtning. Boka enkelt och få bekräftelse via mejl.</p>
+</div>
+</header>
+
+<div class="card grid">
+<div>
+<form id="pickupForm" action="https://formspree.io/f/mgvglbnd" method="POST" enctype="multipart/form-data">
+<label>Namn</label>
+<input name="name" id="name" type="text" required>
+
+<div class="row">
+<div>
+<label>Telefon</label>
+<input name="phone" id="phone" type="tel" pattern="[0-9+ ]+" required>
+</div>
+<div>
+<label>E-post (valfritt)</label>
+<input name="email" id="email" type="email" placeholder="kund@mail.se">
+</div>
+</div>
+
+<label>Adress</label>
+<div class="row">
+<input id="addressInput" name="address" type="text" placeholder="Gatuadress, postnr, stad">
+<button type="button" class="btn" onclick="geocodeAddress()">Visa</button>
+</div>
+
+<label>Vad ska hämtas?</label>
+<div class="checkbox-grid" id="types">
+<label class="checkbox-item"><input type="checkbox" name="type[]" value="Möbler"><span>🛋 Möbler</span></label>
+<label class="checkbox-item"><input type="checkbox" name="type[]" value="Sopsäckar"><span>🗑 Sopsäckar</span></label>
+<label class="checkbox-item"><input type="checkbox" name="type[]" value="Elektronik"><span>💻 Elektronik</span></label>
+<label class="checkbox-item"><input type="checkbox" name="type[]" value="Trädgårdsavfall"><span>🌿 Trädgårdsavfall</span></label>
+<label class="checkbox-item"><input type="checkbox" name="type[]" value="Byggavfall"><span>🧱 Byggavfall</span></label>
+<label class="checkbox-item"><input type="checkbox" name="type[]" value="Vitvaror"><span>❄ Vitvaror</span></label>
+<label class="checkbox-item"><input type="checkbox" name="type[]" value="Secondhand"><span>♻ Second-hand</span></label>
+<label class="checkbox-item"><input type="checkbox" name="type[]" value="Tipp"><span>🏞 Tipp</span></label>
+</div>
+
+<div class="row">
+<div>
+<label>Mängd</label>
+<select id="sackCount" name="sackCount">
+<option value="0">0 säckar</option>
+<option value="1">1–3 säckar</option>
+<option value="2">4–8 säckar</option>
+<option value="3">>8 säckar / full bil</option>
+</select>
+</div>
+<div>
+<label>Önskad dag</label>
+<select id="dateSelect" name="date"></select>
+</div>
+</div>
+
+<label>Tid</label>
+<select id="timeSelect" name="time"></select>
+
+<label>Bild (valfritt)</label>
+<input id="imageInput" type="file" accept="image/*" name="image">
+<img id="imgPreview" class="preview" style="display:none" alt="Förhandsvisning">
+
+<label>Beskrivning</label>
+<textarea id="desc" name="desc" placeholder="T.ex. tungt, trappor, mått..." required></textarea>
+
+<label>Betalning</label>
+<div class="payment-grid">
+<label class="payment-card"><input type="radio" name="payment" value="Swish" checked><span>Swish</span></label>
+<label class="payment-card"><input type="radio" name="payment" value="Kontant"><span>Kontant</span></label>
+</div>
+
+<div class="pricebox">
+<strong>Preliminärt pris:</strong> <span id="priceDisplay">Beräknar...</span>
+<input type="hidden" name="price" id="hiddenPrice">
+</div>
+
+<div style="display:flex;gap:10px;margin-top:12px">
+<button class="btn" type="button" id="previewBtn">Visa sammanfattning</button>
+<button class="btn yellow" type="submit" id="submitBtn" onclick="calculatePrice()">Skicka bokning</button>
+</div>
+
+<!-- QR-kod -->
+<label>QR-kod</label>
+<div style="text-align:center; margin-top:8px;">
+  <img id="qrCode" src="" alt="QR-kod för bokning">
+  <p class="small">Skanna för att boka direkt på din telefon</p>
+</div>
+
+<div id="response" style="margin-top:10px"></div>
+</form>
+</div>
+
+<aside>
+<div style="margin-bottom:12px">
+<div style="font-weight:700;margin-bottom:6px">Karta — markera plats</div>
+<div id="map"></div>
+<div class="small" style="margin-top:8px">Klicka på kartan eller dra markören för att justera platsen.</div>
+</div>
+
+<div class="card" style="margin-top:12px;background:linear-gradient(90deg,#fffef6,#fffaf2);">
+<h3 style="margin:0 0 8px 0">Så funkar det</h3>
+<p class="small">Du bokar tid, laddar upp en bild och beskriver. Vi bekräftar och meddelar slutpris. Betala med Swish eller kontant vid upphämtning.</p>
+</div>
+</aside>
+</div>
+</div>
+
+<!-- Modal -->
+<div class="modal" id="summaryModal">
+<div class="modal-content">
+<span class="modal-close" id="modalClose">&times;</span>
+<h3>Sammanfattning</h3>
+<div id="modalBody"></div>
+<button class="btn yellow" id="modalCloseBtn">Stäng</button>
+</div>
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+/* ---------- KARTA ---------- */
+const defaultCenter=[57.7089,11.9746];
+const map = L.map('map').setView(defaultCenter,12);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+let marker = L.marker(defaultCenter,{draggable:true}).addTo(map);
+
+map.on('click', e => marker.setLatLng(e.latlng));
+marker.on('moveend', e=>{
+  const p = e.target.getLatLng();
+  document.getElementById('addressInput').value = `${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}`;
+});
+
+/* ---------- DATUM & TID ---------- */
+const dateSelect = document.getElementById('dateSelect');
+for(let i=0;i<14;i++){
+  const d=new Date(); d.setDate(d.getDate()+i);
+  const opt = document.createElement('option');
+  opt.value = d.toISOString().split('T')[0];
+  opt.text = d.toLocaleDateString('sv-SE');
+  dateSelect.appendChild(opt);
+}
+
+const timeSelect = document.getElementById('timeSelect');
+for(let h=10; h<17; h++){
+  const next = h+1;
+  const text = `${String(h).padStart(2,'0')}:00–${String(next).padStart(2,'0')}:00`;
+  const opt = document.createElement('option');
+  opt.value = text;
+  opt.text = text;
+  timeSelect.appendChild(opt);
+}
+
+/* ---------- BILDFÖRHANDSVISNING ---------- */
+const imgInput = document.getElementById('imageInput');
+const imgPreview = document.getElementById('imgPreview');
+imgInput.addEventListener('change', e=>{
+  const f = e.target.files[0];
+  if(!f){ imgPreview.style.display='none'; return; }
+  if(f.size>4*1024*1024){ alert('Max 4 MB'); e.target.value=''; return; }
+  const reader = new FileReader();
+  reader.onload = ()=>{ imgPreview.src=reader.result; imgPreview.style.display='block'; };
+  reader.readAsDataURL(f);
+});
+
+/* ---------- PRIS ---------- */
+const typePrices = { Möbler:200, Vitvaror:300, Byggavfall:250, Trädgårdsavfall:120, Elektronik:80, Tipp:150, Secondhand:80 };
+function calculatePrice(){
+  let price=0;
+  const sack=document.getElementById('sackCount').value;
+  if(sack==='1') price+=150; if(sack==='2') price+=350; if(sack==='3') price+=700;
+  const types = Array.from(document.querySelectorAll('input[name="type[]"]:checked')).map(x=>x.value);
+  types.forEach(t=>{ if(typePrices[t]) price+=typePrices[t]; });
+  price=Math.max(price,120);
+  document.getElementById('priceDisplay').innerText=price+' kr (preliminärt)';
+  document.getElementById('hiddenPrice').value = price+' kr (preliminärt)';
+}
+document.querySelectorAll('#sackCount, input[name="type[]"]').forEach(el=>el.addEventListener('change', calculatePrice));
+calculatePrice();
+
+/* ---------- MODAL SAMMANFATTNING ---------- */
+const modal = document.getElementById('summaryModal');
+const modalBody = document.getElementById('modalBody');
+const modalClose = document.getElementById('modalClose');
+const modalCloseBtn = document.getElementById('modalCloseBtn');
+
+document.getElementById('previewBtn').addEventListener('click', ()=>{
+  const summary = {
+    datum: document.getElementById('dateSelect').value,
+    tid: document.getElementById('timeSelect').value,
+    namn: document.getElementById('name').value.trim(),
+    telefon: document.getElementById('phone').value.trim(),
+    adress: document.getElementById('addressInput').value.trim(),
+    typ: Array.from(document.querySelectorAll('input[name="type[]"]:checked')).map(x=>x.value),
+    pris: document.getElementById('hiddenPrice').value
+  };
+  modalBody.innerHTML = `<p><strong>Namn:</strong> ${summary.namn}</p>
+  <p><strong>Telefon:</strong> ${summary.telefon}</p>
+  <p><strong>Adress:</strong> ${summary.adress}</p>
+  <p><strong>Datum & Tid:</strong> ${summary.datum} ${summary.tid}</p>
+  <p><strong>Typ:</strong> ${summary.typ.join(', ')}</p>
+  <p><strong>Pris:</strong> ${summary.pris}</p>`;
+  modal.style.display='flex';
+});
+modalClose.onclick = modalCloseBtn.onclick = ()=>{ modal.style.display='none'; };
+window.onclick = e=>{ if(e.target==modal) modal.style.display='none'; };
+
+/* ---------- QR-KOD ---------- */
+const qrImg = document.getElementById('qrCode');
+const url = encodeURIComponent(window.location.href); // tar nuvarande sida, ändra till din boknings-URL om du vill
+qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?data=${url}&size=150x150`;
+</script>
+</body>
+</html>
